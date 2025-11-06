@@ -1,0 +1,123 @@
+import sys
+from copy import deepcopy
+
+from prompts import Prompts
+from evaluate import Evaluate
+import code_init
+import json
+import ast
+import re
+import traceback
+import random
+import time
+from io import StringIO
+import contextlib
+
+class ASPE_Interface:
+    def __init__(self, size, api_endpoint, api_key, model_LLM, debug_mode):
+        self.size = size  # Population size
+        self.prompts = Prompts(api_endpoint, api_key, model_LLM, debug_mode)
+        self.population = []  # Will store dictionaries with program_info
+        self.generation = 0
+        self.code_init = code_init.CodeInit()  # Initialize code_init instance
+
+    def initialize_population(self):
+        """Initialize population using the multi-agent system to mutate the initial code"""
+        initial_code = self.code_init.get_initial_code_1()  # Get initial code from code_init instance
+        program_info = {'code': initial_code}
+        run_time, completion_time = Evaluate(program_info['code'])
+        program_info['time'] = run_time
+        program_info['score'] = completion_time
+        print(program_info['score'])
+        self.population.append(program_info)
+    """
+    def initialize_population(self):
+        for i in range(1, 9):
+            method_name = f"get_initial_code_{i}"
+            initial_code = getattr(self.code_init, method_name)() # Get initial code from code_init instance
+            program_info = {'code': initial_code}
+            run_time, completion_time = Evaluate(program_info['code'])
+            program_info['time'] = run_time
+            program_info['score'] = completion_time
+            self.population.append(program_info)
+    """
+
+    def generate_new_individual(self, program_info):
+        """Use the multi-agent system to generate a new individual"""
+        try:
+            # Step 1: Code understanding - get sub-problems and their algorithms
+            response1 = self.prompts.get_sub_prob("TSP", program_info)
+            program_info.update(self.prompts.extract_sub_problems(response1))
+            # Step 2: Select sub-problem to improve
+            response2 = self.prompts.get_select_prob("TSP", program_info)
+            program_info.update(self.prompts.extract_sub_problem(response2))
+
+            # Step 3: Algorithm improvement
+            response4 = self.prompts.get_alg_imp("TSP", program_info)
+            program_info.update(self.prompts.extract_new_algorithm(response4))
+
+            # Step 4: Code improvement
+            response5 = self.prompts.get_code_imp("TSP", program_info)
+            program_info.update(self.prompts.extract_code(response5))
+            # print(program_info)
+            run_time, completion_time = Evaluate(program_info['code'])
+            program_info['time'] = run_time
+            program_info['score'] = completion_time
+            return program_info
+
+        except Exception as e:
+            m = 0
+            # If there's an error, use the debug agent to fix the code
+            while m < 5:
+                try:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    # Get full stack trace as string
+                    full_traceback = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+                    print(f"Error in generation process: {full_traceback}")
+                    program_info['error'] = full_traceback  # Store complete traceback instead of just error message
+                    #print(f"Error in generation process: {str(e)}")
+                    #program_info['error'] = str(e)
+                    response_debug = self.prompts.get_code_debug("TSP", program_info)
+                    program_info.update(self.prompts.extract_code(response_debug))
+                    run_time, completion_time = Evaluate(program_info['code'])
+                    program_info['time'] = run_time
+                    program_info['score'] = completion_time
+                    return program_info
+                except Exception as e:
+                    m += 1
+            program_info['score'] = 1000000
+            program_info['time'] = 1000000
+            return program_info
+
+
+    def evolve(self, m, maxsize):
+        """Run the evolutionary process for m generations"""
+        if not self.population:
+            self.initialize_population()
+
+        for generation in range(m):
+            self.generation += 1
+
+            # Generate new individuals
+            while len(self.population) < maxsize:
+                # Select parent (tournament selection)
+                parent = random.choice(self.population[:len(self.population)//2+1])  # Select from top 50%
+                # Generate offspring using the multi-agent system
+                offspring = self.generate_new_individual(deepcopy(parent))
+                #print("yes!")
+                print(offspring)
+                self.population.append(offspring)
+
+            # Sort and select the best individuals
+            self.population.sort(key=lambda x: x['score'], reverse=False)
+            self.population = self.population[:self.size]
+
+            print(f"Generation {self.generation}: Best score = {self.population[0]['score']}")
+
+    def get_best_solution(self):
+        """Return the best solution found"""
+        if not self.population:
+            return None
+        self.population.sort(key=lambda x: x['score'], reverse=False)
+        return self.population[0]
+

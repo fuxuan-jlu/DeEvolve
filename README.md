@@ -1,5 +1,8 @@
 # DeEvolve: LLM-driven Evolutionary Optimization for Truck-Drone Delivery
 
+<img width="1230" height="639" alt="image" src="https://github.com/user-attachments/assets/045f18a5-aefb-40b4-be55-9e6803476811" />
+
+
 ## Overview
 
 We propose **DeEvolve**, a novel framework that integrates large language models with evolutionary computation to automatically optimize truck-drone last-mile delivery route planning algorithms. The study validates the method through experiments on the Flying Sidekick Traveling Salesman Problem (FSTSP), Traveling Salesman Problem (TSP), and Capacitated Vehicle Routing Problem (CVRP). The results demonstrate that this approach effectively enhances the performance of the original algorithms, particularly for the structurally complex FSTSP, where its algorithm decomposition strategy exhibits unique advantages. This work provides new insights and methodologies for the application of artificial intelligence in logistics and delivery.
